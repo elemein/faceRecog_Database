@@ -16,12 +16,10 @@ try:
 
 except sqlite3.OperationalError:
     cursor.execute(f"""CREATE TABLE profiles (
-                        PersonID int,
                         Name varchar(255),
                         filePath varchar(255)
                         );""")
     connection.commit()
-# ---
 
 # Fill the table with database info.
 cursor.execute("SELECT * FROM profiles;")
@@ -31,10 +29,10 @@ known_encodings = []
 
 # For each profile, add a face encoding.
 for profile in profile_table:
-    image = face_recognition.load_image_file(f"""{profile[2]}""")
+    image = face_recognition.load_image_file(f"""{profile[1]}""")
     face_encoding = face_recognition.face_encodings(image)[0]
 
-    known_encoding_names.append(profile[1])
+    known_encoding_names.append(profile[0])
     known_encodings.append(face_encoding)
 
 # Initialize capture cam.
@@ -43,6 +41,7 @@ display_string = ''
 start = time.time()
 addFace = False
 input_name = 'a'
+start = time.time() - 6
 
 master = tkinter.Tk()
 
@@ -50,11 +49,7 @@ def getEntry(en):
     global input_name
     input_name = entry.get()
 
-    print(input_name)
-
     master.destroy()
-
-    return input_name
 
 label = tkinter.Label(master, text="What is your name?")
 label.grid(row=0, sticky=tkinter.W)
@@ -83,9 +78,22 @@ while True:
                 master.mainloop()
 
                 filename = 'a'.join(input_name.split())
-                
+
+                cursor.execute(f"""INSERT INTO profiles VALUES ('{input_name}', '{filename}.png' );""")
+                connection.commit()
+
                 unknown = cv2.imread('unknownFace.png')
                 cv2.imwrite(f'{filename}.png', unknown)
+
+                cursor.execute("SELECT * FROM profiles;")
+                profile_table = cursor.fetchall()
+
+                for profile in profile_table:
+                    image = face_recognition.load_image_file(f"""{profile[1]}""")
+                    face_encoding = face_recognition.face_encodings(image)[0]
+
+                    known_encoding_names.append(profile[0])
+                    known_encodings.append(face_encoding)
 
         else:
             addFace = False
@@ -108,7 +116,7 @@ while True:
                     display_string = f'Hello {name}!'
                     start = time.time()
                 else:
-                    display_string = 'Unknown Face. Press [SPACE] again in 5s to add.'
+                    display_string = 'Unknown Face. Press [SPACE] again to add.'
                     start = time.time()
 
                     cv2.imwrite('unknownFace.png', frame)
@@ -121,8 +129,8 @@ while True:
     if (time.time()) < (start + 5):
         raw_frame = cv2.putText(raw_frame, display_string, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 2)
     else:
-        raw_frame = cv2.putText(raw_frame, 'Press space to recognize faces.', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 2)
-
+        raw_frame = cv2.putText(raw_frame, 'Press [SPACE] to recognize faces.', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 2)
+        raw_frame = cv2.putText(raw_frame, '[ESC] to quit.', (50, 100),cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 2)
     cv2.imshow('Video', raw_frame)
 
 video_capture.release()
