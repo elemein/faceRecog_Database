@@ -2,6 +2,8 @@ import face_recognition
 import cv2
 import numpy as np
 import sqlite3
+import time
+import tkinter
 
 # Connect to profiles.db; or create it if it doesnt exist.
 connection = sqlite3.connect("profiles.db")
@@ -37,11 +39,34 @@ for profile in profile_table:
 
 # Initialize capture cam.
 video_capture = cv2.VideoCapture(0)
+display_string = ''
+start = time.time()
+addFace = False
+input_name = 'a'
+
+master = tkinter.Tk()
+
+def getEntry(en):
+    global input_name
+    input_name = entry.get()
+
+    print(input_name)
+
+    master.destroy()
+
+    return input_name
+
+label = tkinter.Label(master, text="What is your name?")
+label.grid(row=0, sticky=tkinter.W)
+
+entry = tkinter.Entry(master)
+entry.grid(row=0, column=1)
+
+entry.bind('<Return>', getEntry)
 
 while True:
     # Grab a single frame of video and show it
     ret, raw_frame = video_capture.read()
-    cv2.imshow('Video', raw_frame)
 
     k = cv2.waitKey(1)
     if k%256 == 27:
@@ -50,27 +75,55 @@ while True:
 
     # If you press space.
     if k%256 == 32:
-
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
         frame = raw_frame[:, :, ::-1]
 
+        if (time.time()) < (start + 5):
+            if addFace == True:
+                master.mainloop()
+
+                filename = 'a'.join(input_name.split())
+                
+                unknown = cv2.imread('unknownFace.png')
+                cv2.imwrite(f'{filename}.png', unknown)
+
+        else:
+            addFace = False
+
         # Find face encoding
         try:
-            face_encoding = face_recognition.face_encodings(frame)[0]
+            face_encodings = face_recognition.face_encodings(frame)
+
+            if len(face_encodings) > 1:
+                display_string = 'One face at a time please.'
+                start = time.time()
+
+            else:
+                for known_name in known_encoding_names:
+                    matches = face_recognition.compare_faces(known_encodings, face_encodings[0])
+
+                if True in matches:
+                    first_match_index = matches.index(True)
+                    name = known_encoding_names[first_match_index]
+                    display_string = f'Hello {name}!'
+                    start = time.time()
+                else:
+                    display_string = 'Unknown Face. Press [SPACE] again in 5s to add.'
+                    start = time.time()
+
+                    cv2.imwrite('unknownFace.png', frame)
+                    addFace = True
+
         except IndexError:
-            print("No face found.")
+            display_string = 'No faces found.'
+            start = time.time()
 
-        for enc in known_encoding_names:
-            matches = face_recognition.compare_faces(known_encodings, face_encoding)
+    if (time.time()) < (start + 5):
+        raw_frame = cv2.putText(raw_frame, display_string, (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 2)
+    else:
+        raw_frame = cv2.putText(raw_frame, 'Press space to recognize faces.', (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 2)
 
-        if True in matches:
-            first_match_index = matches.index(True)
-            name = known_encoding_names[first_match_index]
-            print(f'this is {name}')
-        else:
-            print('Unknown user.')
-
-    a = not True
+    cv2.imshow('Video', raw_frame)
 
 video_capture.release()
 cv2.destroyAllWindows()
